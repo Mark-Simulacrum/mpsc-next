@@ -3,6 +3,22 @@ use std::thread;
 use std::time::Duration;
 
 #[test]
+fn send_fails_if_no_receiver() {
+    let (tx, _) = channel();
+
+    assert!(tx.send(10).is_err());
+}
+
+#[test]
+fn send_fails_if_no_receiver_bounded() {
+    for i in 0..10 {
+        let (tx, _) = sync_channel(i);
+
+        assert!(tx.send(10).is_err());
+    }
+}
+
+#[test]
 fn send_drop_cannot_recv() {
     let (_, receiver): (_, Receiver<i32>) = channel();
 
