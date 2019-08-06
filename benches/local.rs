@@ -2,7 +2,7 @@
 extern crate criterion;
 
 use criterion::{AxisScale, Criterion, ParameterizedBenchmark, PlotConfiguration};
-use slow_mpsc as mpsc;
+use alt_mpsc as mpsc;
 
 mod message;
 

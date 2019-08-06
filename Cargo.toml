@@ -1,5 +1,5 @@
 [package]
-name = "slow-mpsc"
+name = "alt-mpsc"
 version = "0.1.0"
 authors = ["Mark Rousskov <mark.simulacrum@gmail.com>"]
 edition = "2018"
