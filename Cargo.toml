@@ -14,3 +14,13 @@ criterion = "0.2"
 [[bench]]
 name = "std"
 harness = false
+
+[[bench]]
+name = "local"
+harness = false
+
+[profile.release]
+debug = 2
+
+[profile.bench]
+debug = 2

@@ -2,7 +2,7 @@
 extern crate criterion;
 
 use criterion::{AxisScale, Criterion, ParameterizedBenchmark, PlotConfiguration};
-use std::sync::mpsc;
+use slow_mpsc as mpsc;
 
 mod message;
 
@@ -86,7 +86,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     let messages = vec![1, 10, 100, 1000, 10_000];
 
     c.bench(
-        "sequential-std",
+        "sequential-local",
         ParameterizedBenchmark::new(
             "unbounded",
             |b, input| b.iter(|| sequential(*input)),
@@ -113,7 +113,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         });
     }
 
-    c.bench("async-std", bench.plot_config(plot_config.clone()));
+    c.bench("async-local", bench.plot_config(plot_config.clone()));
 }
 
 criterion_group!(std, criterion_benchmark);
