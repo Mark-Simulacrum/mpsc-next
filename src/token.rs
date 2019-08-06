@@ -1,11 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 
-#[derive(Debug, Clone)]
-pub struct Token {
-    inner: Arc<Inner>,
-}
-
 #[derive(Debug)]
 struct Inner {
     is_present: AtomicBool,
@@ -13,19 +8,29 @@ struct Inner {
     condvar: Condvar,
 }
 
-impl Token {
-    pub fn new() -> Token {
-        Token {
-            inner: Arc::new(Inner {
-                is_present: AtomicBool::new(true),
-                woke: Mutex::new(false),
-                condvar: Condvar::new(),
-            }),
-        }
-    }
+pub fn tokens() -> (SignalToken, WaitToken) {
+    let token = Arc::new(Inner {
+        is_present: AtomicBool::new(true),
+        woke: Mutex::new(false),
+        condvar: Condvar::new(),
+    });
+    (
+        SignalToken {
+            inner: token.clone(),
+        },
+        WaitToken { inner: token },
+    )
+}
 
-    pub fn is_present(&self) -> bool {
-        self.inner.is_present.load(Ordering::SeqCst)
+#[derive(Debug, Clone)]
+pub struct SignalToken {
+    inner: Arc<Inner>,
+}
+
+impl SignalToken {
+    pub fn wake(&self) {
+        *self.inner.woke.lock().unwrap() = true;
+        self.inner.condvar.notify_all();
     }
 
     pub fn leave(&self) {
@@ -34,10 +39,16 @@ impl Token {
         // make sure to unblock all other threads if we've dropped
         self.inner.condvar.notify_all();
     }
+}
 
-    pub fn wake(&self) {
-        *self.inner.woke.lock().unwrap() = true;
-        self.inner.condvar.notify_all();
+#[derive(Debug, Clone)]
+pub struct WaitToken {
+    inner: Arc<Inner>,
+}
+
+impl WaitToken {
+    pub fn is_present(&self) -> bool {
+        self.inner.is_present.load(Ordering::SeqCst)
     }
 
     pub fn wait(&self) {
