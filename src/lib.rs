@@ -138,17 +138,6 @@ impl<T> ReceiverInner<T> {
             }
         }
     }
-
-    fn recv(&self) -> Result<T, RecvError> {
-        loop {
-            match self.try_recv() {
-                Ok(value) => return Ok(value),
-                Err(TryRecvError::Disconnected) => return Err(RecvError),
-                Err(TryRecvError::Empty) => {}
-            }
-            self.sender.wait();
-        }
-    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -253,9 +242,16 @@ impl<T> Receiver<T> {
     }
 
     pub fn recv(&self) -> Result<T, RecvError> {
-        match &self.0 {
-            Receiver_::Normal(n) => n.recv(),
-            Receiver_::Rendezvous(n) => n.recv().map_err(|()| RecvError),
+        loop {
+            match self.try_recv() {
+                Ok(value) => return Ok(value),
+                Err(TryRecvError::Disconnected) => return Err(RecvError),
+                Err(TryRecvError::Empty) => {}
+            }
+            match &self.0 {
+                Receiver_::Normal(n) => n.sender.wait(),
+                Receiver_::Rendezvous(n) => n.sender.wait(),
+            }
         }
     }
 

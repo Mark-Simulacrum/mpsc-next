@@ -18,7 +18,7 @@ pub struct Sender<T> {
 pub struct Receiver<T> {
     inner: Arc<Inner<T>>,
     self_token: SignalToken,
-    sender: WaitToken,
+    pub(super) sender: WaitToken,
 }
 
 pub fn channel<T>() -> (Arc<Sender<T>>, Receiver<T>) {
@@ -99,20 +99,6 @@ impl<T> Sender<T> {
 }
 
 impl<T> Receiver<T> {
-    pub fn recv(&self) -> Result<T, ()> {
-        loop {
-            match self.try_recv() {
-                Ok(value) => return Ok(value),
-                Err(TryRecvError::Disconnected) => {
-                    return Err(());
-                }
-                Err(TryRecvError::Empty) => {}
-            }
-            // Wait for sender to wake us up after sending a value
-            self.sender.wait();
-        }
-    }
-
     pub fn try_recv(&self) -> Result<T, TryRecvError> {
         if let Some(value) = self.inner.place.lock().unwrap().take() {
             // Let sender know we've taken the value
