@@ -11,6 +11,42 @@ fn send_fails_if_no_receiver() {
 }
 
 #[test]
+fn rendezvous_try_send_full() {
+    let (tx, rx) = sync_channel(0);
+    for _ in 0..1000 {
+        assert_eq!(rx.try_recv(), Err(TryRecvError::Empty));
+        assert_eq!(tx.try_send(1), Err(TrySendError::Full(1)));
+        assert_eq!(rx.try_recv(), Err(TryRecvError::Empty));
+        assert_eq!(tx.try_send(1), Err(TrySendError::Full(1)));
+        assert_eq!(rx.try_recv(), Err(TryRecvError::Empty));
+    }
+}
+
+#[test]
+fn rendezvous_try_send_success() {
+    //use std::sync::mpsc::sync_channel;
+    for _ in 0..100 {
+        let (tx, rx) = sync_channel(0);
+        let t = std::thread::spawn(move || {
+            assert_eq!(rx.recv(), Ok(1));
+            assert_eq!(rx.recv(), Ok(2));
+            assert_eq!(rx.recv(), Ok(3));
+        });
+
+        std::thread::sleep(Duration::from_millis(50));
+        assert_eq!(tx.try_send(1), Ok(()), "sent 1");
+        std::thread::sleep(Duration::from_millis(20));
+        assert_eq!(tx.try_send(2), Ok(()), "sent 2");
+        std::thread::sleep(Duration::from_millis(20));
+        assert_eq!(tx.try_send(3), Ok(()), "sent 3");
+        // this might be disconnected, we don't know
+        assert!(tx.try_send(4).is_err());
+
+        t.join().unwrap();
+    }
+}
+
+#[test]
 fn send_fails_if_no_receiver_bounded() {
     for i in 0..10 {
         let (tx, _) = sync_channel(i);

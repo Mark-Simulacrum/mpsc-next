@@ -30,21 +30,28 @@ pub fn channel<T>() -> (Arc<Sender<T>>, Receiver<T>) {
 }
 
 impl<T> Sender<T> {
-    pub fn send(&self, value: T) -> Result<(), T> {
-        loop {
-            if self.token.is_present() {
-                let mut guard = self.place.lock().unwrap();
-                if guard.is_none() {
-                    // We can write our value in; make sure to not release the
-                    // lock so that we don't race with anyone
-                    *guard = Some(value);
-                    break;
-                } else {
-                    // fall through -- the receiver hasn't *yet* read the
-                    // previous value
-                }
+    fn try_put(&self, value: T) -> Result<(), TrySendError<T>> {
+        if self.token.is_present() {
+            let mut guard = self.place.lock().unwrap();
+            if guard.is_none() {
+                // We can write our value in; make sure to not release the
+                // lock so that we don't race with anyone
+                *guard = Some(value);
+                Ok(())
             } else {
-                return Err(value);
+                Err(TrySendError::Full(value))
+            }
+        } else {
+            Err(TrySendError::Disconnected(value))
+        }
+    }
+
+    pub fn send(&self, mut value: T) -> Result<(), T> {
+        loop {
+            match self.try_put(value) {
+                Ok(()) => break,
+                Err(TrySendError::Disconnected(value)) => return Err(value),
+                Err(TrySendError::Full(ret)) => value = ret,
             }
             self.token.wait();
         }
@@ -69,19 +76,21 @@ impl<T> Sender<T> {
     }
 
     pub fn try_send(&self, value: T) -> Result<(), TrySendError<T>> {
-        if !self.token.is_present() {
-            return Err(TrySendError::Disconnected(value));
-        }
-        *self.place.lock().unwrap() = Some(value);
+        self.try_put(value)?;
         self.token.wake();
-        // FIXME: we don't want to wait; how do we "instantaneously" wait to
-        // give the receiver an opportunity to steal the value from us?
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        // FIXME: we kinda want to "instantaneously" wait to give receiver a chance to take the
+        // value, but we can't block. How should that be modeled?
         let value = self.place.lock().unwrap().take();
-        if let Some(value) = value {
-            Err(TrySendError::Full(value))
-        } else {
-            // the receiver took the value out
-            Ok(())
+        match value {
+            None => return Ok(()),
+            Some(value) => {
+                if self.token.is_present() {
+                    return Err(TrySendError::Full(value));
+                } else {
+                    return Err(TrySendError::Disconnected(value));
+                }
+            }
         }
     }
 }
