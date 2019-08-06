@@ -92,12 +92,6 @@ impl<T> SenderInner<T> {
 #[derive(Debug, PartialEq, Eq)]
 pub struct SendError<T>(T);
 
-impl<T> Drop for SenderInner<T> {
-    fn drop(&mut self) {
-        self.token.leave()
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct Sender<T>(Arc<SenderInner<T>>);
 
@@ -140,12 +134,6 @@ impl<T> ReceiverInner<T> {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct RecvError;
-
-impl<T> Drop for ReceiverInner<T> {
-    fn drop(&mut self) {
-        self.token.leave();
-    }
-}
 
 pub struct Iter<'a, T> {
     receiver: &'a Receiver<T>,

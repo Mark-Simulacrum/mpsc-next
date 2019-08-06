@@ -108,15 +108,3 @@ impl<T> Receiver<T> {
         }
     }
 }
-
-impl<T> Drop for Sender<T> {
-    fn drop(&mut self) {
-        self.token.leave();
-    }
-}
-
-impl<T> Drop for Receiver<T> {
-    fn drop(&mut self) {
-        self.token.leave();
-    }
-}

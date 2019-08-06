@@ -18,14 +18,17 @@ impl Token {
     pub fn wake(&self) {
         self.signal.wake();
     }
-    pub fn leave(&self) {
-        self.signal.leave()
-    }
     pub fn is_present(&self) -> bool {
         self.wait.is_present()
     }
     pub fn wait(&self) {
         self.wait.wait()
+    }
+}
+
+impl Drop for Token {
+    fn drop(&mut self) {
+        self.signal.leave()
     }
 }
 
