@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 mod token;
-use token::{SignalToken, WaitToken};
+use token::Token;
 
 mod rendezvous;
 
@@ -49,8 +49,7 @@ impl<T> Queue<T> {
 #[derive(Debug)]
 struct SenderInner<T> {
     inner: Arc<Queue<T>>,
-    self_token: SignalToken,
-    receiver: WaitToken,
+    token: Token,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -61,14 +60,14 @@ pub enum TrySendError<T> {
 
 impl<T> SenderInner<T> {
     fn try_send(&self, value: T) -> Result<(), TrySendError<T>> {
-        if !self.receiver.is_present() {
+        if !self.token.is_present() {
             return Err(TrySendError::Disconnected(value));
         }
         if let Err(ret) = self.inner.push(value) {
             return Err(TrySendError::Full(ret));
         }
         // Wake anyone waiting for us up
-        self.self_token.wake();
+        self.token.wake();
         Ok(())
     }
 
@@ -79,7 +78,7 @@ impl<T> SenderInner<T> {
                 Err(TrySendError::Full(ret)) => {
                     value = ret;
                     // Wait for us to be woken up by a receiver
-                    self.receiver.wait();
+                    self.token.wait();
                 }
                 Err(TrySendError::Disconnected(value)) => {
                     return Err(SendError(value));
@@ -95,7 +94,7 @@ pub struct SendError<T>(T);
 
 impl<T> Drop for SenderInner<T> {
     fn drop(&mut self) {
-        self.self_token.leave()
+        self.token.leave()
     }
 }
 
@@ -111,8 +110,7 @@ impl<T> Sender<T> {
 #[derive(Debug)]
 struct ReceiverInner<T> {
     inner: Arc<Queue<T>>,
-    self_token: SignalToken,
-    sender: WaitToken,
+    token: Token,
 }
 
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
@@ -125,10 +123,10 @@ impl<T> ReceiverInner<T> {
     fn try_recv(&self) -> Result<T, TryRecvError> {
         // If we check *after* popping then the sender may have placed data in the buffer and then
         // left, which would lead to an incorrect return of Disconnected, instead of Empty.
-        let present = self.sender.is_present();
+        let present = self.token.is_present();
         if let Some(value) = self.inner.pop() {
             // we've successfully read, so wake up the sender
-            self.self_token.wake();
+            self.token.wake();
             Ok(value)
         } else {
             if present {
@@ -145,7 +143,7 @@ pub struct RecvError;
 
 impl<T> Drop for ReceiverInner<T> {
     fn drop(&mut self) {
-        self.self_token.leave();
+        self.token.leave();
     }
 }
 
@@ -189,18 +187,15 @@ impl<T> IntoIterator for Receiver<T> {
 
 pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
     let inner = Arc::new(Queue::unbounded());
-    let (signal_sender, wait_sender) = token::tokens();
-    let (signal_receiver, wait_receiver) = token::tokens();
+    let (sender, receiver) = token::tokens();
     (
         Sender(Arc::new(SenderInner {
             inner: inner.clone(),
-            self_token: signal_sender,
-            receiver: wait_receiver,
+            token: sender,
         })),
         Receiver(Receiver_::Normal(ReceiverInner {
             inner,
-            self_token: signal_receiver,
-            sender: wait_sender,
+            token: receiver,
         })),
     )
 }
@@ -249,8 +244,8 @@ impl<T> Receiver<T> {
                 Err(TryRecvError::Empty) => {}
             }
             match &self.0 {
-                Receiver_::Normal(n) => n.sender.wait(),
-                Receiver_::Rendezvous(n) => n.sender.wait(),
+                Receiver_::Normal(n) => n.token.wait(),
+                Receiver_::Rendezvous(n) => n.token.wait(),
             }
         }
     }
@@ -269,18 +264,15 @@ enum Receiver_<T> {
 pub fn sync_channel<T>(capacity: usize) -> (SyncSender<T>, Receiver<T>) {
     if capacity > 0 {
         let inner = Arc::new(Queue::bounded(capacity));
-        let (signal_sender, wait_sender) = token::tokens();
-        let (signal_receiver, wait_receiver) = token::tokens();
+        let (sender, receiver) = token::tokens();
         (
             SyncSender(SyncSenderInner::Normal(Arc::new(SenderInner {
                 inner: inner.clone(),
-                self_token: signal_sender,
-                receiver: wait_receiver,
+                token: sender,
             }))),
             Receiver(Receiver_::Normal(ReceiverInner {
                 inner,
-                self_token: signal_receiver,
-                sender: wait_sender,
+                token: receiver,
             })),
         )
     } else {

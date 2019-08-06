@@ -1,4 +1,4 @@
-use crate::token::{self, SignalToken, WaitToken};
+use crate::token::{self, Token};
 use crate::{TryRecvError, TrySendError};
 use std::sync::{Arc, Mutex};
 
@@ -10,33 +10,28 @@ struct Inner<T> {
 #[derive(Debug)]
 pub struct Sender<T> {
     inner: Arc<Inner<T>>,
-    self_token: SignalToken,
-    receiver: WaitToken,
+    token: Token,
 }
 
 #[derive(Debug)]
 pub struct Receiver<T> {
     inner: Arc<Inner<T>>,
-    self_token: SignalToken,
-    pub(super) sender: WaitToken,
+    pub(super) token: Token,
 }
 
 pub fn channel<T>() -> (Arc<Sender<T>>, Receiver<T>) {
     let inner = Arc::new(Inner {
         place: Mutex::new(None),
     });
-    let (signal_sender, wait_sender) = token::tokens();
-    let (signal_receiver, wait_receiver) = token::tokens();
+    let (sender, receiver) = token::tokens();
     (
         Arc::new(Sender {
             inner: inner.clone(),
-            self_token: signal_sender,
-            receiver: wait_receiver,
+            token: sender,
         }),
         Receiver {
             inner,
-            self_token: signal_receiver,
-            sender: wait_sender,
+            token: receiver,
         },
     )
 }
@@ -44,7 +39,7 @@ pub fn channel<T>() -> (Arc<Sender<T>>, Receiver<T>) {
 impl<T> Sender<T> {
     pub fn send(&self, value: T) -> Result<(), T> {
         loop {
-            if self.receiver.is_present() {
+            if self.token.is_present() {
                 let mut guard = self.inner.place.lock().unwrap();
                 if guard.is_none() {
                     // We can write our value in; make sure to not release the
@@ -58,11 +53,11 @@ impl<T> Sender<T> {
             } else {
                 return Err(value);
             }
-            self.receiver.wait();
+            self.token.wait();
         }
         loop {
-            self.self_token.wake();
-            if self.receiver.is_present() {
+            self.token.wake();
+            if self.token.is_present() {
                 if self.inner.place.lock().unwrap().is_none() {
                     return Ok(());
                 } else {
@@ -76,16 +71,16 @@ impl<T> Sender<T> {
                     None => return Ok(()),
                 }
             }
-            self.receiver.wait();
+            self.token.wait();
         }
     }
 
     pub fn try_send(&self, value: T) -> Result<(), TrySendError<T>> {
-        if !self.receiver.is_present() {
+        if !self.token.is_present() {
             return Err(TrySendError::Disconnected(value));
         }
         *self.inner.place.lock().unwrap() = Some(value);
-        self.self_token.wake();
+        self.token.wake();
         // FIXME: we don't want to wait; how do we "instantaneously" wait to
         // give the receiver an opportunity to steal the value from us?
         let value = self.inner.place.lock().unwrap().take();
@@ -102,10 +97,10 @@ impl<T> Receiver<T> {
     pub fn try_recv(&self) -> Result<T, TryRecvError> {
         if let Some(value) = self.inner.place.lock().unwrap().take() {
             // Let sender know we've taken the value
-            self.self_token.wake();
+            self.token.wake();
             Ok(value)
         } else {
-            if self.sender.is_present() {
+            if self.token.is_present() {
                 Err(TryRecvError::Empty)
             } else {
                 Err(TryRecvError::Disconnected)
@@ -116,12 +111,12 @@ impl<T> Receiver<T> {
 
 impl<T> Drop for Sender<T> {
     fn drop(&mut self) {
-        self.self_token.leave();
+        self.token.leave();
     }
 }
 
 impl<T> Drop for Receiver<T> {
     fn drop(&mut self) {
-        self.self_token.leave();
+        self.token.leave();
     }
 }

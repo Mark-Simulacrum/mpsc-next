@@ -8,7 +8,43 @@ struct Inner {
     condvar: Condvar,
 }
 
-pub fn tokens() -> (SignalToken, WaitToken) {
+#[derive(Debug)]
+pub struct Token {
+    signal: SignalToken,
+    wait: WaitToken,
+}
+
+impl Token {
+    pub fn wake(&self) {
+        self.signal.wake();
+    }
+    pub fn leave(&self) {
+        self.signal.leave()
+    }
+    pub fn is_present(&self) -> bool {
+        self.wait.is_present()
+    }
+    pub fn wait(&self) {
+        self.wait.wait()
+    }
+}
+
+pub fn tokens() -> (Token, Token) {
+    let (signal_a, wait_a) = make_token_pair();
+    let (signal_b, wait_b) = make_token_pair();
+    (
+        Token {
+            signal: signal_a,
+            wait: wait_b,
+        },
+        Token {
+            signal: signal_b,
+            wait: wait_a,
+        },
+    )
+}
+
+fn make_token_pair() -> (SignalToken, WaitToken) {
     let token = Arc::new(Inner {
         is_present: AtomicBool::new(true),
         woke: Mutex::new(false),
@@ -22,18 +58,18 @@ pub fn tokens() -> (SignalToken, WaitToken) {
     )
 }
 
-#[derive(Debug, Clone)]
-pub struct SignalToken {
+#[derive(Debug)]
+struct SignalToken {
     inner: Arc<Inner>,
 }
 
 impl SignalToken {
-    pub fn wake(&self) {
+    fn wake(&self) {
         *self.inner.woke.lock().unwrap() = true;
         self.inner.condvar.notify_all();
     }
 
-    pub fn leave(&self) {
+    fn leave(&self) {
         // make sure we only leave once
         assert!(self.inner.is_present.swap(false, Ordering::SeqCst));
         // make sure to unblock all other threads if we've dropped
@@ -41,17 +77,17 @@ impl SignalToken {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct WaitToken {
+#[derive(Debug)]
+struct WaitToken {
     inner: Arc<Inner>,
 }
 
 impl WaitToken {
-    pub fn is_present(&self) -> bool {
+    fn is_present(&self) -> bool {
         self.inner.is_present.load(Ordering::SeqCst)
     }
 
-    pub fn wait(&self) {
+    fn wait(&self) {
         let mut woke = self.inner.woke.lock().unwrap();
         // This is a bit unusual in the sense that we're going to exit if either we've been woken
         // directly or the other end has disconnected. Note that the condvar is notified in both
