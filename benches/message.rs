@@ -1,6 +1,6 @@
 use std::fmt;
 
-const LEN: usize = 1;
+const LEN: usize = 30;
 
 #[derive(Clone, Copy)]
 pub struct Message(pub [usize; LEN]);

@@ -23,6 +23,19 @@ fn rendezvous_try_send_full() {
 }
 
 #[test]
+fn rendezvous_smoke() {
+    for _ in 0..1000 {
+        let (tx, rx) = sync_channel(0);
+
+        std::thread::spawn(move || {
+            tx.send(0).unwrap();
+        });
+
+        assert_eq!(rx.recv().unwrap(), 0);
+    }
+}
+
+#[test]
 fn rendezvous_try_send_success() {
     for _ in 0..100 {
         let (tx, rx) = sync_channel(0);

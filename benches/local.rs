@@ -1,8 +1,8 @@
 #[macro_use]
 extern crate criterion;
 
-use criterion::{AxisScale, Criterion, ParameterizedBenchmark, PlotConfiguration};
 use alt_mpsc as mpsc;
+use criterion::{AxisScale, Criterion, ParameterizedBenchmark, PlotConfiguration};
 
 mod message;
 
@@ -32,6 +32,31 @@ fn sequential_bounded(messages: usize) {
 
 fn async_unbounded(threads: usize, messages: usize) {
     let (tx, rx) = mpsc::channel();
+
+    if threads == 1 {
+        std::thread::spawn(move || {
+            for i in 0..messages / threads {
+                tx.send(message::new(i)).unwrap();
+            }
+        });
+    } else {
+        for _ in 0..threads {
+            let tx = tx.clone();
+            std::thread::spawn(move || {
+                for i in 0..messages / threads {
+                    tx.send(message::new(i)).unwrap();
+                }
+            });
+        }
+    }
+
+    for _ in 0..(messages / threads) * threads {
+        rx.recv().unwrap();
+    }
+}
+
+fn async_rendezvous(threads: usize, messages: usize) {
+    let (tx, rx) = mpsc::sync_channel(0);
 
     if threads == 1 {
         std::thread::spawn(move || {
@@ -102,7 +127,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         messages.clone(),
     );
 
-    for &thread in &[1, 2, 3, 4] {
+    for &thread in &[1, 2, 4, 8, 16] {
         if thread != 1 {
             bench = bench.with_function(format!("unbounded {}", thread), move |b, input| {
                 b.iter(move || async_unbounded(thread, *input))
@@ -114,6 +139,22 @@ fn criterion_benchmark(c: &mut Criterion) {
     }
 
     c.bench("async-local", bench.plot_config(plot_config.clone()));
+
+    let mut bench = ParameterizedBenchmark::new(
+        "rendezvous 1",
+        |b, input| b.iter(|| async_rendezvous(1, *input)),
+        messages.clone(),
+    );
+
+    for &thread in &[1, 2, 4, 8, 16] {
+        if thread != 1 {
+            bench = bench.with_function(format!("rendezvous {}", thread), move |b, input| {
+                b.iter(move || async_rendezvous(thread, *input))
+            });
+        }
+    }
+
+    c.bench("rendezvous-local", bench.plot_config(plot_config.clone()));
 }
 
 criterion_group!(std, criterion_benchmark);
