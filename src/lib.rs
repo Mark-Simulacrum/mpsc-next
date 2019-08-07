@@ -114,6 +114,17 @@ pub enum TryRecvError {
 }
 
 impl<T> ReceiverInner<T> {
+    fn recv(&self) -> Result<T, RecvError> {
+        loop {
+            match self.try_recv() {
+                Ok(value) => return Ok(value),
+                Err(TryRecvError::Disconnected) => return Err(RecvError),
+                Err(TryRecvError::Empty) => {}
+            }
+            self.token.wait();
+        }
+    }
+
     fn try_recv(&self) -> Result<T, TryRecvError> {
         // If we check *after* popping then the sender may have placed data in the buffer and then
         // left, which would lead to an incorrect return of Disconnected, instead of Empty.
@@ -225,16 +236,9 @@ impl<T> Receiver<T> {
     }
 
     pub fn recv(&self) -> Result<T, RecvError> {
-        loop {
-            match self.try_recv() {
-                Ok(value) => return Ok(value),
-                Err(TryRecvError::Disconnected) => return Err(RecvError),
-                Err(TryRecvError::Empty) => {}
-            }
-            match &self.0 {
-                Receiver_::Normal(n) => n.token.wait(),
-                Receiver_::Rendezvous(n) => n.token.wait(),
-            }
+        match &self.0 {
+            Receiver_::Normal(n) => n.recv(),
+            Receiver_::Rendezvous(n) => n.recv(),
         }
     }
 
