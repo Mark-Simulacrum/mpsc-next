@@ -98,5 +98,6 @@ impl WaitToken {
         while !*woke && self.is_present() {
             woke = self.inner.condvar.wait(woke).unwrap();
         }
+        *woke = false;
     }
 }
