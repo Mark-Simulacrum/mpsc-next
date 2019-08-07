@@ -24,7 +24,7 @@ fn rendezvous_try_send_full() {
 
 #[test]
 fn rendezvous_try_send_success() {
-    for _ in 0..1000 {
+    for _ in 0..100 {
         let (tx, rx) = sync_channel(0);
         let t = std::thread::spawn(move || {
             assert_eq!(rx.recv(), Ok(1));
