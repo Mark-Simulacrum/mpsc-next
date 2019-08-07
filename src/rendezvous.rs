@@ -80,9 +80,10 @@ impl<T> Shared<T> {
 
     fn sender_ready(&self) -> bool {
         // This is much simpler because the receier doesn't state transition (unlike the sender)
-        self.state
-            .compare_and_swap(RECEIVER_AVAILABLE, BOTH_AVAILABLE, Ordering::SeqCst)
-            == RECEIVER_AVAILABLE
+        let state =
+            self.state
+                .compare_and_swap(RECEIVER_AVAILABLE, BOTH_AVAILABLE, Ordering::SeqCst);
+        state == RECEIVER_AVAILABLE || state == BOTH_AVAILABLE
     }
 }
 
