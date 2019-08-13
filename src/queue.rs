@@ -29,11 +29,21 @@ impl<T> Queue<T> {
         }
     }
 
-    pub fn push(&self, value: T) -> Result<(), T> {
+    fn acquire_lock(&self) {
         while self.lock.compare_and_swap(false, true, Ordering::SeqCst) {
             // busy loop
         }
+    }
+
+    unsafe fn release_lock(&self) {
+        // We don't swap here because it's guaranteed that we're the ones that acquired the lock
+        // per the CAS above
+        self.lock.store(false, Ordering::SeqCst);
+    }
+
+    pub fn push(&self, value: T) -> Result<(), T> {
         unsafe {
+            self.acquire_lock();
             let buf = &mut *self.v.get();
             if let Some(max_buf) = self.bounded {
                 if buf.len() >= max_buf {
@@ -41,20 +51,16 @@ impl<T> Queue<T> {
                 }
             }
             buf.push_back(value);
+            self.release_lock();
         }
-        // We don't swap here because it's guaranteed that we're the ones that acquired the lock
-        // per the CAS above
-        self.lock.store(false, Ordering::SeqCst);
         Ok(())
     }
 
     pub fn pop(&self) -> Option<T> {
         unsafe {
-            while self.lock.compare_and_swap(false, true, Ordering::SeqCst) {
-                // busy loop
-            }
+            self.acquire_lock();
             let res = (&mut *self.v.get()).pop_front();
-            self.lock.store(false, Ordering::SeqCst);
+            self.release_lock();
             res
         }
     }
