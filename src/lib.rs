@@ -151,6 +151,17 @@ impl<T> IntoIterator for Receiver<T> {
     }
 }
 
+pub struct TryIter<'a, T> {
+    receiver: &'a Receiver<T>,
+}
+
+impl<T> Iterator for TryIter<'_, T> {
+    type Item = T;
+    fn next(&mut self) -> Option<T> {
+        self.receiver.try_recv().ok()
+    }
+}
+
 pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
     let inner = Arc::new(Queue::unbounded());
     let (sender, receiver) = token::tokens();
@@ -207,6 +218,10 @@ impl<T> Receiver<T> {
             Receiver_::Normal(n) => n.recv(),
             Receiver_::Rendezvous(n) => n.recv(),
         }
+    }
+
+    pub fn try_iter(&self) -> TryIter<'_, T> {
+        TryIter { receiver: self }
     }
 
     pub fn iter(&self) -> Iter<'_, T> {
