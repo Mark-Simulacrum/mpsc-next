@@ -571,98 +571,98 @@ fn stream_send_recv_stress() {
     }
 }
 
-//#[test]
-//fn oneshot_single_thread_recv_timeout() {
-//    let (tx, rx) = channel();
-//    tx.send(()).unwrap();
-//    assert_eq!(rx.recv_timeout(Duration::from_millis(1)), Ok(()));
-//    assert_eq!(
-//        rx.recv_timeout(Duration::from_millis(1)),
-//        Err(RecvTimeoutError::Timeout)
-//    );
-//    tx.send(()).unwrap();
-//    assert_eq!(rx.recv_timeout(Duration::from_millis(1)), Ok(()));
-//}
-//
-//#[test]
-//fn stress_recv_timeout_two_threads() {
-//    let (tx, rx) = channel();
-//    let stress = stress_factor() + 100;
-//    let timeout = Duration::from_millis(100);
-//
-//    thread::spawn(move || {
-//        for i in 0..stress {
-//            if i % 2 == 0 {
-//                thread::sleep(timeout * 2);
-//            }
-//            tx.send(1usize).unwrap();
-//        }
-//    });
-//
-//    let mut recv_count = 0;
-//    loop {
-//        match rx.recv_timeout(timeout) {
-//            Ok(n) => {
-//                assert_eq!(n, 1usize);
-//                recv_count += 1;
-//            }
-//            Err(RecvTimeoutError::Timeout) => continue,
-//            Err(RecvTimeoutError::Disconnected) => break,
-//        }
-//    }
-//
-//    assert_eq!(recv_count, stress);
-//}
-//
-//#[test]
-//fn recv_timeout_upgrade() {
-//    let (tx, rx) = channel::<()>();
-//    let timeout = Duration::from_millis(1);
-//    let _tx_clone = tx.clone();
-//
-//    let start = Instant::now();
-//    assert_eq!(rx.recv_timeout(timeout), Err(RecvTimeoutError::Timeout));
-//    assert!(Instant::now() >= start + timeout);
-//}
-//
-//#[test]
-//fn stress_recv_timeout_shared() {
-//    let (tx, rx) = channel();
-//    let stress = stress_factor() + 100;
-//
-//    for i in 0..stress {
-//        let tx = tx.clone();
-//        thread::spawn(move || {
-//            thread::sleep(Duration::from_millis(i as u64 * 10));
-//            tx.send(1usize).unwrap();
-//        });
-//    }
-//
-//    drop(tx);
-//
-//    let mut recv_count = 0;
-//    loop {
-//        match rx.recv_timeout(Duration::from_millis(10)) {
-//            Ok(n) => {
-//                assert_eq!(n, 1usize);
-//                recv_count += 1;
-//            }
-//            Err(RecvTimeoutError::Timeout) => continue,
-//            Err(RecvTimeoutError::Disconnected) => break,
-//        }
-//    }
-//
-//    assert_eq!(recv_count, stress);
-//}
-//
-//#[test]
-//fn very_long_recv_timeout_wont_panic() {
-//    let (tx, rx) = channel::<()>();
-//    let join_handle = thread::spawn(move || rx.recv_timeout(Duration::from_secs(u64::max_value())));
-//    thread::sleep(Duration::from_secs(1));
-//    assert!(tx.send(()).is_ok());
-//    assert_eq!(join_handle.join().unwrap(), Ok(()));
-//}
+#[test]
+fn oneshot_single_thread_recv_timeout() {
+    let (tx, rx) = channel();
+    tx.send(()).unwrap();
+    assert_eq!(rx.recv_timeout(Duration::from_millis(1)), Ok(()));
+    assert_eq!(
+        rx.recv_timeout(Duration::from_millis(1)),
+        Err(RecvTimeoutError::Timeout)
+    );
+    tx.send(()).unwrap();
+    assert_eq!(rx.recv_timeout(Duration::from_millis(1)), Ok(()));
+}
+
+#[test]
+fn stress_recv_timeout_two_threads() {
+    let (tx, rx) = channel();
+    let stress = stress_factor() + 100;
+    let timeout = Duration::from_millis(100);
+
+    thread::spawn(move || {
+        for i in 0..stress {
+            if i % 2 == 0 {
+                thread::sleep(timeout * 2);
+            }
+            tx.send(1usize).unwrap();
+        }
+    });
+
+    let mut recv_count = 0;
+    loop {
+        match rx.recv_timeout(timeout) {
+            Ok(n) => {
+                assert_eq!(n, 1usize);
+                recv_count += 1;
+            }
+            Err(RecvTimeoutError::Timeout) => continue,
+            Err(RecvTimeoutError::Disconnected) => break,
+        }
+    }
+
+    assert_eq!(recv_count, stress);
+}
+
+#[test]
+fn recv_timeout_upgrade() {
+    let (tx, rx) = channel::<()>();
+    let timeout = Duration::from_millis(1);
+    let _tx_clone = tx.clone();
+
+    let start = Instant::now();
+    assert_eq!(rx.recv_timeout(timeout), Err(RecvTimeoutError::Timeout));
+    assert!(Instant::now() >= start + timeout);
+}
+
+#[test]
+fn stress_recv_timeout_shared() {
+    let (tx, rx) = channel();
+    let stress = stress_factor() + 100;
+
+    for i in 0..stress {
+        let tx = tx.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(i as u64 * 10));
+            tx.send(1usize).unwrap();
+        });
+    }
+
+    drop(tx);
+
+    let mut recv_count = 0;
+    loop {
+        match rx.recv_timeout(Duration::from_millis(10)) {
+            Ok(n) => {
+                assert_eq!(n, 1usize);
+                recv_count += 1;
+            }
+            Err(RecvTimeoutError::Timeout) => continue,
+            Err(RecvTimeoutError::Disconnected) => break,
+        }
+    }
+
+    assert_eq!(recv_count, stress);
+}
+
+#[test]
+fn very_long_recv_timeout_wont_panic() {
+    let (tx, rx) = channel::<()>();
+    let join_handle = thread::spawn(move || rx.recv_timeout(Duration::from_secs(u64::max_value())));
+    thread::sleep(Duration::from_secs(1));
+    assert!(tx.send(()).is_ok());
+    assert_eq!(join_handle.join().unwrap(), Ok(()));
+}
 
 #[test]
 fn recv_a_lot() {
@@ -676,28 +676,28 @@ fn recv_a_lot() {
     }
 }
 
-//#[test]
-//fn shared_recv_timeout() {
-//    let (tx, rx) = channel();
-//    let total = 5;
-//    for _ in 0..total {
-//        let tx = tx.clone();
-//        thread::spawn(move || {
-//            tx.send(()).unwrap();
-//        });
-//    }
-//
-//    for _ in 0..total {
-//        rx.recv().unwrap();
-//    }
-//
-//    assert_eq!(
-//        rx.recv_timeout(Duration::from_millis(1)),
-//        Err(RecvTimeoutError::Timeout)
-//    );
-//    tx.send(()).unwrap();
-//    assert_eq!(rx.recv_timeout(Duration::from_millis(1)), Ok(()));
-//}
+#[test]
+fn shared_recv_timeout() {
+    let (tx, rx) = channel();
+    let total = 5;
+    for _ in 0..total {
+        let tx = tx.clone();
+        thread::spawn(move || {
+            tx.send(()).unwrap();
+        });
+    }
+
+    for _ in 0..total {
+        rx.recv().unwrap();
+    }
+
+    assert_eq!(
+        rx.recv_timeout(Duration::from_millis(1)),
+        Err(RecvTimeoutError::Timeout)
+    );
+    tx.send(()).unwrap();
+    assert_eq!(rx.recv_timeout(Duration::from_millis(1)), Ok(()));
+}
 
 #[test]
 fn shared_chan_stress() {
@@ -760,33 +760,33 @@ fn test_recv_iter_break() {
     assert_eq!(count_rx.recv().unwrap(), 4);
 }
 
-//#[test]
-//fn test_recv_try_iter() {
-//    let (request_tx, request_rx) = channel();
-//    let (response_tx, response_rx) = channel();
-//
-//    // Request `x`s until we have `6`.
-//    let t = thread::spawn(move || {
-//        let mut count = 0;
-//        loop {
-//            for x in response_rx.try_iter() {
-//                count += x;
-//                if count == 6 {
-//                    return count;
-//                }
-//            }
-//            request_tx.send(()).unwrap();
-//        }
-//    });
-//
-//    for _ in request_rx.iter() {
-//        if response_tx.send(2).is_err() {
-//            break;
-//        }
-//    }
-//
-//    assert_eq!(t.join().unwrap(), 6);
-//}
+#[test]
+fn test_recv_try_iter() {
+    let (request_tx, request_rx) = channel();
+    let (response_tx, response_rx) = channel();
+
+    // Request `x`s until we have `6`.
+    let t = thread::spawn(move || {
+        let mut count = 0;
+        loop {
+            for x in response_rx.try_iter() {
+                count += x;
+                if count == 6 {
+                    return count;
+                }
+            }
+            request_tx.send(()).unwrap();
+        }
+    });
+
+    for _ in request_rx.iter() {
+        if response_tx.send(2).is_err() {
+            break;
+        }
+    }
+
+    assert_eq!(t.join().unwrap(), 6);
+}
 
 #[test]
 fn test_recv_into_iter_owned() {
@@ -895,16 +895,16 @@ mod sync {
         assert_eq!(rx.recv().unwrap(), 1);
     }
 
-    //#[test]
-    //fn recv_timeout() {
-    //    let (tx, rx) = sync_channel::<i32>(1);
-    //    assert_eq!(
-    //        rx.recv_timeout(Duration::from_millis(1)),
-    //        Err(RecvTimeoutError::Timeout)
-    //    );
-    //    tx.send(1).unwrap();
-    //    assert_eq!(rx.recv_timeout(Duration::from_millis(1)), Ok(1));
-    //}
+    #[test]
+    fn recv_timeout() {
+        let (tx, rx) = sync_channel::<i32>(1);
+        assert_eq!(
+            rx.recv_timeout(Duration::from_millis(1)),
+            Err(RecvTimeoutError::Timeout)
+        );
+        tx.send(1).unwrap();
+        assert_eq!(rx.recv_timeout(Duration::from_millis(1)), Ok(1));
+    }
 
     #[test]
     fn smoke_threads() {
@@ -989,70 +989,70 @@ mod sync {
         }
     }
 
-    //#[test]
-    //fn stress_recv_timeout_two_threads() {
-    //    let (tx, rx) = sync_channel::<i32>(0);
-    //
-    //    thread::spawn(move || {
-    //        for _ in 0..10000 {
-    //            tx.send(1).unwrap();
-    //        }
-    //    });
-    //
-    //    let mut recv_count = 0;
-    //    loop {
-    //        match rx.recv_timeout(Duration::from_millis(1)) {
-    //            Ok(v) => {
-    //                assert_eq!(v, 1);
-    //                recv_count += 1;
-    //            }
-    //            Err(RecvTimeoutError::Timeout) => continue,
-    //            Err(RecvTimeoutError::Disconnected) => break,
-    //        }
-    //    }
-    //
-    //    assert_eq!(recv_count, 10000);
-    //}
+    #[test]
+    fn stress_recv_timeout_two_threads() {
+        let (tx, rx) = sync_channel::<i32>(0);
 
-    //#[test]
-    //fn stress_recv_timeout_shared() {
-    //    const AMT: u32 = 1000;
-    //    const NTHREADS: u32 = 8;
-    //    let (tx, rx) = sync_channel::<i32>(0);
-    //    let (dtx, drx) = sync_channel::<()>(0);
-    //
-    //    thread::spawn(move || {
-    //        let mut recv_count = 0;
-    //        loop {
-    //            match rx.recv_timeout(Duration::from_millis(10)) {
-    //                Ok(v) => {
-    //                    assert_eq!(v, 1);
-    //                    recv_count += 1;
-    //                }
-    //                Err(RecvTimeoutError::Timeout) => continue,
-    //                Err(RecvTimeoutError::Disconnected) => break,
-    //            }
-    //        }
-    //
-    //        assert_eq!(recv_count, AMT * NTHREADS);
-    //        assert!(rx.try_recv().is_err());
-    //
-    //        dtx.send(()).unwrap();
-    //    });
-    //
-    //    for _ in 0..NTHREADS {
-    //        let tx = tx.clone();
-    //        thread::spawn(move || {
-    //            for _ in 0..AMT {
-    //                tx.send(1).unwrap();
-    //            }
-    //        });
-    //    }
-    //
-    //    drop(tx);
-    //
-    //    drx.recv().unwrap();
-    //}
+        thread::spawn(move || {
+            for _ in 0..10000 {
+                tx.send(1).unwrap();
+            }
+        });
+
+        let mut recv_count = 0;
+        loop {
+            match rx.recv_timeout(Duration::from_millis(1)) {
+                Ok(v) => {
+                    assert_eq!(v, 1);
+                    recv_count += 1;
+                }
+                Err(RecvTimeoutError::Timeout) => continue,
+                Err(RecvTimeoutError::Disconnected) => break,
+            }
+        }
+
+        assert_eq!(recv_count, 10000);
+    }
+
+    #[test]
+    fn stress_recv_timeout_shared() {
+        const AMT: u32 = 1000;
+        const NTHREADS: u32 = 8;
+        let (tx, rx) = sync_channel::<i32>(0);
+        let (dtx, drx) = sync_channel::<()>(0);
+
+        thread::spawn(move || {
+            let mut recv_count = 0;
+            loop {
+                match rx.recv_timeout(Duration::from_millis(10)) {
+                    Ok(v) => {
+                        assert_eq!(v, 1);
+                        recv_count += 1;
+                    }
+                    Err(RecvTimeoutError::Timeout) => continue,
+                    Err(RecvTimeoutError::Disconnected) => break,
+                }
+            }
+
+            assert_eq!(recv_count, AMT * NTHREADS);
+            assert!(rx.try_recv().is_err());
+
+            dtx.send(()).unwrap();
+        });
+
+        for _ in 0..NTHREADS {
+            let tx = tx.clone();
+            thread::spawn(move || {
+                for _ in 0..AMT {
+                    tx.send(1).unwrap();
+                }
+            });
+        }
+
+        drop(tx);
+
+        drx.recv().unwrap();
+    }
 
     #[test]
     fn stress_shared() {
