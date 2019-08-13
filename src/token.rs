@@ -75,14 +75,14 @@ struct SignalToken {
 impl SignalToken {
     fn wake(&self) {
         *self.inner.woke.lock().unwrap() = true;
-        self.inner.condvar.notify_all();
+        self.inner.condvar.notify_one();
     }
 
     fn leave(&self) {
         // make sure we only leave once
         assert!(self.inner.is_present.swap(false, Ordering::SeqCst));
         // make sure to unblock all other threads if we've dropped
-        self.inner.condvar.notify_all();
+        self.inner.condvar.notify_one();
     }
 }
 
