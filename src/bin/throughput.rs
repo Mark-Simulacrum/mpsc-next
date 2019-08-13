@@ -8,16 +8,16 @@ use std::sync::{
 use std::thread;
 use std::time::Instant;
 
-const THREADS: (u32, u32) = (3, 3);
-const PER_THREAD_RUNS: u32 = 20;
+const THREADS: (u32, u32) = (1, 6);
+const PER_THREAD_RUNS: u32 = 5;
 
 macro_rules! go {
-    ($channel:ident, $msg:expr) => {{
+    ($desc:expr, $channel:expr, $msg:expr) => {{
         let mut results = BTreeMap::new();
         for threads in THREADS.0..=THREADS.1 {
             for _ in 0..PER_THREAD_RUNS {
                 let go = Arc::new(AtomicBool::new(false));
-                let (tx, rx) = $channel();
+                let (tx, rx) = $channel;
                 let mut joiners = Vec::new();
                 for _ in 0..threads {
                     let go = go.clone();
@@ -73,6 +73,7 @@ macro_rules! go {
                     res
                 );
                 results.entry(threads).or_insert_with(Vec::new).push(res);
+                serialize($desc, &results).unwrap();
             }
         }
 
@@ -94,12 +95,14 @@ fn serialize(desc: &str, results: &BTreeMap<u32, Vec<u128>>) -> std::io::Result<
 }
 
 fn main() {
-    let res = go!(alt_channel, ());
-    eprintln!("Alt Throughput: {:?}", res);
-    serialize("alt", &res).unwrap();
-    if std::env::var_os("BENCH_STD").is_some() {
-        let res = go!(std_channel, ());
-        eprintln!("std Throughput: {:?}", res);
-        serialize("std", &res).unwrap();
-    }
+    //let res = go!(alt_channel(), ());
+    //eprintln!("Alt Throughput: {:?}", res);
+    //serialize("alt", &res).unwrap();
+    let _res = go!("alt-rendezvous", alt_mpsc::sync_channel(0), ());
+    let _res = go!("std-rendezvous", std::sync::mpsc::sync_channel(0), ());
+    //if std::env::var_os("BENCH_STD").is_some() {
+    //    let res = go!(std_channel(), ());
+    //    eprintln!("std Throughput: {:?}", res);
+    //    serialize("std", &res).unwrap();
+    //}
 }
