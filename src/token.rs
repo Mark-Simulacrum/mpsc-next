@@ -1,5 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
+use std::time::Instant;
 
 #[derive(Debug)]
 struct Inner {
@@ -23,6 +24,11 @@ impl Token {
     }
     pub fn wait(&self) {
         self.wait.wait()
+    }
+
+    /// Returns true if this operation timed out
+    pub fn wait_until(&self, deadline: Instant) -> bool {
+        self.wait.wait_until(deadline)
     }
 }
 
@@ -99,5 +105,37 @@ impl WaitToken {
             woke = self.inner.condvar.wait(woke).unwrap();
         }
         *woke = false;
+    }
+
+    fn wait_until(&self, deadline: Instant) -> bool {
+        let mut woke = self.inner.woke.lock().unwrap();
+        // This is a bit unusual in the sense that we're going to exit if either we've been woken
+        // directly or the other end has disconnected. Note that the condvar is notified in both
+        // wake() and leave()
+        let mut timed_out = false;
+        while !*woke && self.is_present() {
+            let left = match deadline.checked_duration_since(Instant::now()) {
+                Some(v) => v,
+                // We've already gone past the deadline, so just exit
+                None => {
+                    timed_out = true;
+                    break;
+                }
+            };
+            let ret = self.inner.condvar.wait_timeout(woke, left).unwrap();
+            woke = ret.0;
+            if ret.1.timed_out() {
+                timed_out = true;
+                break;
+            }
+        }
+        if *woke {
+            // If we were woken up (possibly right before/at the timeout),
+            // indicate that we didn't actually time out
+            timed_out = false;
+        }
+        *woke = false;
+
+        timed_out
     }
 }

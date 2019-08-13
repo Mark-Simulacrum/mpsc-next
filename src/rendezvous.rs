@@ -1,7 +1,8 @@
 use crate::token::{self, Token};
-use crate::{RecvError, TryRecvError, TrySendError};
+use crate::{RecvError, RecvTimeoutError, TryRecvError, TrySendError};
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 // Sending side acts first: start at EMPTY
 // Sender            | Receiver
@@ -243,6 +244,41 @@ impl<T> Receiver<T> {
                         .state
                         .compare_and_swap(RECEIVER_AVAILABLE, EMPTY, Ordering::SeqCst);
                     return Err(RecvError);
+                }
+            }
+        }
+    }
+
+    pub fn recv_deadline(&self, deadline: Instant) -> Result<T, RecvTimeoutError> {
+        loop {
+            self.inner
+                .state
+                .compare_and_swap(EMPTY, RECEIVER_AVAILABLE, Ordering::SeqCst);
+            // Attempt to receive a value. This will bail if the state is not
+            // SENDER_AVAILABLE, but that's fine: we will wake up senders and
+            // wait for them to notice that we're now available.
+            match self.try_recv() {
+                Ok(value) => return Ok(value),
+                Err(TryRecvError::Empty) => {
+                    self.token.wake();
+                    if self.token.wait_until(deadline) {
+                        self.inner.state.compare_and_swap(
+                            RECEIVER_AVAILABLE,
+                            EMPTY,
+                            Ordering::SeqCst,
+                        );
+                        return Err(RecvTimeoutError::Timeout);
+                    }
+                }
+                Err(TryRecvError::Disconnected) => {
+                    // This doesn't matter, as there's no senders left to tell
+                    // us anything, so this mostly just tries to make sure the
+                    // state is consistent even in the cases where it probably
+                    // doesn't matter.
+                    self.inner
+                        .state
+                        .compare_and_swap(RECEIVER_AVAILABLE, EMPTY, Ordering::SeqCst);
+                    return Err(RecvTimeoutError::Disconnected);
                 }
             }
         }

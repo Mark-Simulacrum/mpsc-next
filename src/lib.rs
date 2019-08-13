@@ -1,6 +1,8 @@
 #![feature(optin_builtin_traits)]
+#![feature(checked_duration_since)]
 
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 mod queue;
 mod rendezvous;
@@ -79,6 +81,20 @@ pub enum TryRecvError {
     Disconnected,
 }
 
+#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+pub enum RecvTimeoutError {
+    Timeout,
+    Disconnected,
+}
+
+impl From<RecvError> for RecvTimeoutError {
+    fn from(err: RecvError) -> RecvTimeoutError {
+        match err {
+            RecvError => RecvTimeoutError::Disconnected,
+        }
+    }
+}
+
 impl<T> ReceiverInner<T> {
     fn recv(&self) -> Result<T, RecvError> {
         loop {
@@ -88,6 +104,19 @@ impl<T> ReceiverInner<T> {
                 Err(TryRecvError::Empty) => {}
             }
             self.token.wait();
+        }
+    }
+
+    fn recv_deadline(&self, deadline: Instant) -> Result<T, RecvTimeoutError> {
+        loop {
+            match self.try_recv() {
+                Ok(value) => return Ok(value),
+                Err(TryRecvError::Disconnected) => return Err(RecvTimeoutError::Disconnected),
+                Err(TryRecvError::Empty) => {}
+            }
+            if self.token.wait_until(deadline) {
+                return Err(RecvTimeoutError::Timeout);
+            }
         }
     }
 
@@ -219,6 +248,27 @@ impl<T> Receiver<T> {
         match &self.0 {
             Receiver_::Normal(n) => n.recv(),
             Receiver_::Rendezvous(n) => n.recv(),
+        }
+    }
+
+    pub fn recv_timeout(&self, timeout: Duration) -> Result<T, RecvTimeoutError> {
+        // This is just an optimistic check to be slightly more efficient
+        match self.try_recv() {
+            Ok(item) => return Ok(item),
+            Err(TryRecvError::Disconnected) => return Err(RecvTimeoutError::Disconnected),
+            Err(TryRecvError::Empty) => {}
+        }
+
+        match Instant::now().checked_add(timeout) {
+            Some(deadline) => self.recv_deadline(deadline),
+            None => self.recv().map_err(RecvTimeoutError::from),
+        }
+    }
+
+    pub fn recv_deadline(&self, deadline: Instant) -> Result<T, RecvTimeoutError> {
+        match &self.0 {
+            Receiver_::Normal(n) => n.recv_deadline(deadline),
+            Receiver_::Rendezvous(n) => n.recv_deadline(deadline),
         }
     }
 
