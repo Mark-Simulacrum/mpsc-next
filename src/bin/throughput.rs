@@ -8,13 +8,13 @@ use std::sync::{
 use std::thread;
 use std::time::Instant;
 
-const MAX_THREADS: u32 = 1;
-const PER_THREAD_RUNS: u32 = 5;
+const THREADS: (u32, u32) = (3, 3);
+const PER_THREAD_RUNS: u32 = 20;
 
 macro_rules! go {
     ($channel:ident, $msg:expr) => {{
         let mut results = BTreeMap::new();
-        for threads in 1..=MAX_THREADS {
+        for threads in THREADS.0..=THREADS.1 {
             for _ in 0..PER_THREAD_RUNS {
                 let go = Arc::new(AtomicBool::new(false));
                 let (tx, rx) = $channel();
