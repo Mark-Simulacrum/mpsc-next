@@ -45,11 +45,11 @@ fn rendezvous_try_send_success() {
             assert_eq!(rx.recv(), Ok(3));
         });
 
-        std::thread::sleep(Duration::from_millis(10));
+        std::thread::sleep(Duration::from_millis(100));
         assert_eq!(tx.try_send(1), Ok(()), "sent 1");
-        std::thread::sleep(Duration::from_millis(1));
+        std::thread::sleep(Duration::from_millis(100));
         assert_eq!(tx.try_send(2), Ok(()), "sent 2");
-        std::thread::sleep(Duration::from_millis(1));
+        std::thread::sleep(Duration::from_millis(100));
         assert_eq!(tx.try_send(3), Ok(()), "sent 3");
         // this might be disconnected, we don't know
         assert!(tx.try_send(4).is_err());
