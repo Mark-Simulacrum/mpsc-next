@@ -63,6 +63,10 @@ pub struct SendError<T>(T);
 #[derive(Debug, Clone)]
 pub struct Sender<T>(Arc<SenderInner<T>>);
 
+// The sender is designed to only be used from a single thread.
+impl<T> !Sync for Sender<T> {}
+unsafe impl<T: Send> Send for Sender<T> {}
+
 impl<T> Sender<T> {
     pub fn send(&self, value: T) -> Result<(), SendError<T>> {
         self.0.send(value)
@@ -235,6 +239,7 @@ pub struct Receiver<T>(Receiver_<T>);
 
 // The receiver is designed to only be used from a single thread.
 impl<T> !Sync for Receiver<T> {}
+unsafe impl<T: Send> Send for Receiver<T> {}
 
 impl<T> Receiver<T> {
     pub fn try_recv(&self) -> Result<T, TryRecvError> {
