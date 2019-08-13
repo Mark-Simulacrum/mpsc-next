@@ -1,50 +1,17 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
-mod token;
-use token::Token;
+use std::sync::Arc;
 
+mod queue;
 mod rendezvous;
+mod token;
 
 #[cfg(test)]
 mod test;
 
-#[derive(Debug)]
-struct Queue<T> {
-    bounded: Option<usize>,
-    v: Mutex<VecDeque<T>>,
-}
-
-impl<T> Queue<T> {
-    fn unbounded() -> Queue<T> {
-        Queue {
-            bounded: None,
-            v: Mutex::new(VecDeque::new()),
-        }
-    }
-
-    fn bounded(capacity: usize) -> Queue<T> {
-        Queue {
-            bounded: Some(capacity),
-            v: Mutex::new(VecDeque::with_capacity(capacity)),
-        }
-    }
-
-    fn push(&self, value: T) -> Result<(), T> {
-        let mut buf = self.v.lock().unwrap();
-        if let Some(max_buf) = self.bounded {
-            if buf.len() >= max_buf {
-                return Err(value);
-            }
-        }
-        buf.push_back(value);
-        Ok(())
-    }
-
-    fn pop(&self) -> Option<T> {
-        self.v.lock().unwrap().pop_front()
-    }
-}
+use queue::Queue;
+use token::Token;
 
 #[derive(Debug)]
 struct SenderInner<T> {
