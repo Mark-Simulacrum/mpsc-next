@@ -82,7 +82,7 @@ impl SignalToken {
         // make sure we only leave once
         assert!(self.inner.is_present.swap(false, Ordering::SeqCst));
         // make sure to unblock all other threads if we've dropped
-        self.inner.condvar.notify_one();
+        self.inner.condvar.notify_all();
     }
 }
 
