@@ -1,5 +1,4 @@
-use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
+#![feature(optin_builtin_traits)]
 
 use std::sync::Arc;
 
@@ -204,6 +203,9 @@ impl<T> SyncSender<T> {
 
 #[derive(Debug)]
 pub struct Receiver<T>(Receiver_<T>);
+
+// The receiver is designed to only be used from a single thread.
+impl<T> !Sync for Receiver<T> {}
 
 impl<T> Receiver<T> {
     pub fn try_recv(&self) -> Result<T, TryRecvError> {
