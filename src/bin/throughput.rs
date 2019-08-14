@@ -1,6 +1,4 @@
-use alt_mpsc::channel as alt_channel;
 use std::collections::BTreeMap;
-use std::sync::mpsc::channel as std_channel;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -8,8 +6,8 @@ use std::sync::{
 use std::thread;
 use std::time::Instant;
 
-const THREADS: (u32, u32) = (1, 6);
-const PER_THREAD_RUNS: u32 = 5;
+const THREADS: (u32, u32) = (1, 12);
+const PER_THREAD_RUNS: u32 = 10;
 
 macro_rules! go {
     ($desc:expr, $channel:expr, $msg:expr) => {{
@@ -95,14 +93,8 @@ fn serialize(desc: &str, results: &BTreeMap<u32, Vec<u128>>) -> std::io::Result<
 }
 
 fn main() {
-    //let res = go!(alt_channel(), ());
-    //eprintln!("Alt Throughput: {:?}", res);
-    //serialize("alt", &res).unwrap();
-    let _res = go!("alt-rendezvous", alt_mpsc::sync_channel(0), ());
-    let _res = go!("std-rendezvous", std::sync::mpsc::sync_channel(0), ());
-    //if std::env::var_os("BENCH_STD").is_some() {
-    //    let res = go!(std_channel(), ());
-    //    eprintln!("std Throughput: {:?}", res);
-    //    serialize("std", &res).unwrap();
-    //}
+    go!("alt-unbounded", alt_mpsc::channel(), 0usize);
+    go!("std-unbounded", std::sync::mpsc::channel(), 0usize);
+    go!("alt-rendezvous", alt_mpsc::sync_channel(0), 0usize);
+    go!("std-rendezvous", std::sync::mpsc::sync_channel(0), 0usize);
 }

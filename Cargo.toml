@@ -24,3 +24,4 @@ debug = 2
 
 [profile.bench]
 debug = 2
+lto = 'fat'
